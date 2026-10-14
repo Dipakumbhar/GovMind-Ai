@@ -1,0 +1,162 @@
+@import "tailwindcss";
+
+@theme {
+  --color-navy: #0B3A6E;
+  --color-navy-light: #123F73;
+  --color-navy-dark: #092E58;
+  --color-saffron: #FF9933;
+  --color-saffron-light: #FFB366;
+  --color-success: #138808;
+  --color-warning: #F59E0B;
+  --color-critical: #D32F2F;
+  --color-page-bg: #F4F7FA;
+  --color-surface: #FFFFFF;
+  --color-text-primary: #1F2937;
+  --color-text-secondary: #667085;
+  --color-border: #D9E2EC;
+  --font-sans: 'Inter', 'Noto Sans Devanagari', system-ui, -apple-system, sans-serif;
+}
+
+/* ── Base ── */
+html {
+  scroll-behavior: smooth;
+  /* Prevent horizontal overflow at root level */
+  overflow-x: hidden;
+}
+
+body {
+  margin: 0;
+  font-family: var(--font-sans);
+  background-color: var(--color-page-bg);
+  color: var(--color-text-primary);
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+  overflow-x: hidden;
+}
+
+* {
+  box-sizing: border-box;
+}
+
+/* ── Focus styles for accessibility ── */
+*:focus-visible {
+  outline: 2px solid var(--color-navy);
+  outline-offset: 2px;
+  border-radius: 3px;
+}
+
+/* ── Custom scrollbar ── */
+::-webkit-scrollbar {
+  width: 8px;
+}
+::-webkit-scrollbar-track {
+  background: var(--color-page-bg);
+}
+::-webkit-scrollbar-thumb {
+  background: var(--color-border);
+  border-radius: 4px;
+}
+::-webkit-scrollbar-thumb:hover {
+  background: var(--color-text-secondary);
+}
+
+/* ── Compact Hero Banner ── */
+
+/* Mobile: stacked, auto height */
+.hero-row {
+  display: flex;
+  flex-direction: column;
+  min-height: 0;
+}
+
+/* Desktop (≥1024px): side-by-side, compact fixed height */
+@media (min-width: 1024px) {
+  .hero-row {
+    flex-direction: row;
+    height: 210px;   /* compact banner target */
+    align-items: stretch;
+  }
+}
+
+/* Hero image column */
+.hero-image-col {
+  position: relative;
+  flex-shrink: 0;
+  overflow: hidden;
+}
+
+/* Mobile: 160px tall strip below the text */
+@media (max-width: 1023px) {
+  .hero-image-col {
+    width: 100%;
+    height: 160px;
+  }
+}
+
+/* Desktop: 48% wide, fills the row height */
+@media (min-width: 1024px) {
+  .hero-image-col {
+    width: 48%;
+    height: 100%;     /* fills the 210px row */
+    align-self: stretch;
+  }
+}
+
+.hero-image-col img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  object-position: center 20%;
+  display: block;
+}
+
+/* ── Mobile nav left-border highlight (replaces invalid border-l-3 class) ── */
+.nav-active-mobile {
+  border-left: 3px solid var(--color-saffron);
+  background-color: rgba(255, 153, 51, 0.05);
+  color: var(--color-navy);
+}
+.nav-inactive-mobile {
+  border-left: 3px solid transparent;
+  color: var(--color-text-secondary);
+}
+.nav-inactive-mobile:hover {
+  color: var(--color-navy);
+  background-color: rgba(11, 58, 110, 0.05);
+}
+
+/* ── Touch targets: minimum 44×44px on mobile ── */
+@media (max-width: 767px) {
+  button,
+  a[role="button"],
+  [type="button"],
+  [type="submit"] {
+    min-height: 40px;
+  }
+}
+
+/* ── Reduced motion support ── */
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+    scroll-behavior: auto !important;
+  }
+}
+
+/* ── Step cards hover state ── */
+.step-card:hover {
+  box-shadow: 0 4px 12px rgba(11, 58, 110, 0.08);
+  transform: translateY(-2px);
+}
+.step-card {
+  transition: box-shadow 0.2s ease, transform 0.2s ease;
+}
+@media (prefers-reduced-motion: reduce) {
+  .step-card:hover {
+    transform: none;
+  }
+}

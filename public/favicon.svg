@@ -1,0 +1,24 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64" fill="none">
+  <!-- Civic building base -->
+  <rect x="12" y="38" width="40" height="4" rx="1" fill="#0B3A6E"/>
+  <rect x="16" y="22" width="32" height="16" rx="1" fill="#0B3A6E"/>
+  <!-- Pillars -->
+  <rect x="20" y="24" width="3" height="12" rx="0.5" fill="#F4F7FA"/>
+  <rect x="26" y="24" width="3" height="12" rx="0.5" fill="#F4F7FA"/>
+  <rect x="35" y="24" width="3" height="12" rx="0.5" fill="#F4F7FA"/>
+  <rect x="41" y="24" width="3" height="12" rx="0.5" fill="#F4F7FA"/>
+  <!-- Dome / triangle top -->
+  <polygon points="32,10 14,22 50,22" fill="#0B3A6E"/>
+  <!-- Small dome on top -->
+  <circle cx="32" cy="12" r="3" fill="#FF9933"/>
+  <!-- AI network dots -->
+  <circle cx="8" cy="14" r="2" fill="#FF9933" opacity="0.6"/>
+  <circle cx="56" cy="14" r="2" fill="#FF9933" opacity="0.6"/>
+  <circle cx="8" cy="50" r="2" fill="#0B3A6E" opacity="0.4"/>
+  <circle cx="56" cy="50" r="2" fill="#0B3A6E" opacity="0.4"/>
+  <!-- Connection lines -->
+  <line x1="10" y1="14" x2="29" y2="12" stroke="#FF9933" stroke-width="0.5" opacity="0.4"/>
+  <line x1="54" y1="14" x2="35" y2="12" stroke="#FF9933" stroke-width="0.5" opacity="0.4"/>
+  <!-- Bottom line -->
+  <rect x="8" y="44" width="48" height="2" rx="1" fill="#0B3A6E" opacity="0.3"/>
+</svg>
