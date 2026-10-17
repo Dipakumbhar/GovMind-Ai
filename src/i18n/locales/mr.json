@@ -162,7 +162,8 @@
       "description": "वर्णन",
       "address": "पत्ता",
       "ward": "प्रभाग",
-      "pincode": "पिनकोड"
+      "pincode": "पिनकोड",
+      "coordinates": "निर्देशांक"
     }
   },
   "location": {

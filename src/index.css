@@ -1,3 +1,4 @@
+@import "leaflet/dist/leaflet.css";
 @import "tailwindcss";
 
 @theme {
@@ -160,3 +161,21 @@ body {
     transform: none;
   }
 }
+
+/* ── Leaflet interactive map container ── */
+.location-map-container {
+  height: 220px;
+  width: 100%;
+  border-radius: 0.5rem;
+  overflow: hidden;
+  z-index: 0;
+}
+@media (min-width: 640px) {
+  .location-map-container { height: 280px; }
+}
+@media (min-width: 1024px) {
+  .location-map-container { height: 350px; }
+}
+/* Keep Leaflet controls inside the map, away from fixed site header */
+.leaflet-top, .leaflet-bottom { z-index: 400; }
+.leaflet-pane { z-index: 200; }

@@ -162,14 +162,22 @@
       "description": "Description",
       "address": "Address",
       "ward": "Ward",
-      "pincode": "Pincode"
+      "pincode": "Pincode",
+      "coordinates": "Coordinates"
     }
   },
   "location": {
     "searchPlaceholder": "Search location or address...",
-    "useCurrentLocation": "Use Current Location",
-    "mapPlaceholder": "Map will appear here",
-    "mapNote": "Map integration ready. Connect Google Maps or OpenStreetMap to enable interactive location selection.",
+    "useCurrentLocation": "Use My Current Location",
+    "detecting": "Detecting location...",
+    "locationDetected": "Location detected successfully",
+    "permissionDenied": "Location access was denied. Please allow location access in your browser settings and try again.",
+    "positionUnavailable": "Location information is currently unavailable. Please enter the address manually.",
+    "timeout": "Location request timed out. Please try again.",
+    "geoNotSupported": "Your browser does not support location detection. Please enter the address manually.",
+    "geoError": "Unable to retrieve your location. Please enter the address manually.",
+    "mapInstruction": "Use your current location or select the actual issue location on the map.",
+    "coordsLabel": "Selected coordinates",
     "addressLabel": "Address / Landmark",
     "addressPlaceholder": "e.g. Near Central Park, MG Road",
     "wardLabel": "Ward / Area",
