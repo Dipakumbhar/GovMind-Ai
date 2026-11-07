@@ -1,32 +1,71 @@
 import { useState } from 'react';
-import { Link } from 'react-router-dom';
+import { Link, useNavigate } from 'react-router-dom';
 import {
   User, Mail, Phone, MapPin, Home as HomeIcon, Calendar,
   FileText, ArrowRight, Edit, CheckCircle, Clock, AlertCircle,
-  Globe, Bell, Lock, Save, X,
+  Globe, Bell, Lock, Save, X, ShieldCheck,
 } from 'lucide-react';
 import { useTranslation } from 'react-i18next';
+import { useAuth } from '../contexts/AuthContext';
 import { MOCK_USER } from '../data/mockData';
+
+// Role badge styles
+const ROLE_BADGE = {
+  citizen:     { label: 'Citizen',     cls: 'bg-navy/10 text-navy' },
+  road_agent:  { label: 'Road Agent',  cls: 'bg-amber-100 text-amber-700' },
+  super_admin: { label: 'Super Admin', cls: 'bg-purple-100 text-purple-700' },
+};
 
 export default function Profile() {
   const { t } = useTranslation();
+  const { user: authUser, logout } = useAuth();
+  const navigate = useNavigate();
+
+  // Merge real auth user data with mock fallbacks for fields not yet in DB (stats, etc.)
+  const liveUser = authUser
+    ? {
+        name: authUser.name,
+        email: authUser.email,
+        phone: authUser.phone || MOCK_USER.phone,
+        ward: authUser.ward || MOCK_USER.ward,
+        address: MOCK_USER.address,
+        city: MOCK_USER.city,
+        preferredLanguage: MOCK_USER.preferredLanguage,
+        totalComplaints: MOCK_USER.totalComplaints,
+        resolvedComplaints: MOCK_USER.resolvedComplaints,
+        memberSince: authUser.createdAt
+          ? new Date(authUser.createdAt).toLocaleDateString('en-IN', { year: 'numeric', month: 'short', day: 'numeric' })
+          : MOCK_USER.memberSince,
+        role: authUser.role,
+      }
+    : MOCK_USER;
+
+  const roleBadge = ROLE_BADGE[liveUser.role] || ROLE_BADGE.citizen;
+
+  // Initials from name
+  const initials = liveUser.name
+    .split(' ')
+    .map((n) => n[0])
+    .join('')
+    .toUpperCase()
+    .slice(0, 2);
 
   const STAT_CARDS = [
-    { labelKey: 'profile.totalComplaints', value: MOCK_USER.totalComplaints,  icon: FileText,     bg: 'bg-navy/5',     text: 'text-navy' },
-    { labelKey: 'profile.resolved',        value: MOCK_USER.resolvedComplaints, icon: CheckCircle, bg: 'bg-success/10', text: 'text-success' },
-    { labelKey: 'profile.pending',         value: MOCK_USER.totalComplaints - MOCK_USER.resolvedComplaints, icon: Clock, bg: 'bg-saffron/10', text: 'text-saffron' },
-    { labelKey: 'profile.resolutionRate',  value: `${Math.round((MOCK_USER.resolvedComplaints / MOCK_USER.totalComplaints) * 100)}%`, icon: AlertCircle, bg: 'bg-blue-50', text: 'text-navy-light' },
+    { labelKey: 'profile.totalComplaints', value: liveUser.totalComplaints, icon: FileText, bg: 'bg-navy/5', text: 'text-navy' },
+    { labelKey: 'profile.resolved', value: liveUser.resolvedComplaints, icon: CheckCircle, bg: 'bg-success/10', text: 'text-success' },
+    { labelKey: 'profile.pending', value: liveUser.totalComplaints - liveUser.resolvedComplaints, icon: Clock, bg: 'bg-saffron/10', text: 'text-saffron' },
+    { labelKey: 'profile.resolutionRate', value: liveUser.totalComplaints > 0 ? `${Math.round((liveUser.resolvedComplaints / liveUser.totalComplaints) * 100)}%` : '0%', icon: AlertCircle, bg: 'bg-blue-50', text: 'text-navy-light' },
   ];
 
   const QUICK_ACTIONS = [
-    { labelKey: 'profile.actions.reportNew',      to: '/report',        icon: FileText },
-    { labelKey: 'profile.actions.viewComplaints',  to: '/my-complaints', icon: FileText },
-    { labelKey: 'profile.actions.trackComplaint',  to: '/track',         icon: Clock },
-    { labelKey: 'profile.actions.helpSupport',     to: '/help',          icon: AlertCircle },
+    { labelKey: 'profile.actions.reportNew', to: '/report', icon: FileText },
+    { labelKey: 'profile.actions.viewComplaints', to: '/my-complaints', icon: FileText },
+    { labelKey: 'profile.actions.trackComplaint', to: '/track', icon: Clock },
+    { labelKey: 'profile.actions.helpSupport', to: '/help', icon: AlertCircle },
   ];
 
   const [editing, setEditing] = useState(false);
-  const [profile, setProfile] = useState({ ...MOCK_USER });
+  const [profile, setProfile] = useState({ ...liveUser });
   const [showNotifPrefs, setShowNotifPrefs] = useState(false);
   const [showChangePassword, setShowChangePassword] = useState(false);
   const [notifPrefs, setNotifPrefs] = useState({ email: true, sms: true, statusUpdates: true, weeklyDigest: false });
@@ -39,16 +78,21 @@ export default function Profile() {
     e.preventDefault();
     if (passwordForm.newPass !== passwordForm.confirm) { alert('New passwords do not match.'); return; }
     if (passwordForm.newPass.length < 8) { alert('Password must be at least 8 characters.'); return; }
-    alert('Password change will be available once the backend is connected.');
+    alert('Password change API coming soon.');
     setShowChangePassword(false);
     setPasswordForm({ current: '', newPass: '', confirm: '' });
   };
 
+  const handleLogout = async () => {
+    await logout();
+    navigate('/login', { replace: true });
+  };
+
   const notifItems = [
-    { key: 'email',         labelKey: 'profile.notifEmail',   descKey: 'profile.notifEmailDesc' },
-    { key: 'sms',           labelKey: 'profile.notifSms',     descKey: 'profile.notifSmsDesc' },
-    { key: 'statusUpdates', labelKey: 'profile.notifStatus',  descKey: 'profile.notifStatusDesc' },
-    { key: 'weeklyDigest',  labelKey: 'profile.notifDigest',  descKey: 'profile.notifDigestDesc' },
+    { key: 'email', labelKey: 'profile.notifEmail', descKey: 'profile.notifEmailDesc' },
+    { key: 'sms', labelKey: 'profile.notifSms', descKey: 'profile.notifSmsDesc' },
+    { key: 'statusUpdates', labelKey: 'profile.notifStatus', descKey: 'profile.notifStatusDesc' },
+    { key: 'weeklyDigest', labelKey: 'profile.notifDigest', descKey: 'profile.notifDigestDesc' },
   ];
 
   return (
@@ -58,44 +102,62 @@ export default function Profile() {
         <div className="space-y-4">
           <div className="bg-white border border-border rounded-lg p-6 text-center">
             <div className="w-20 h-20 rounded-full bg-navy flex items-center justify-center mx-auto mb-3">
-              <span className="text-white text-2xl font-bold">RK</span>
+              <span className="text-white text-2xl font-bold">{initials}</span>
             </div>
             <h2 className="font-bold text-text-primary text-lg">{profile.name}</h2>
-            <p className="text-text-secondary text-sm flex items-center justify-center gap-1 mt-1">
-              <Calendar size={13} /> {t('profile.memberSince', { date: profile.memberSince })}
+
+            {/* Role badge */}
+            <span className={`inline-flex items-center gap-1 text-xs font-semibold px-2.5 py-1 rounded-full mt-1 ${roleBadge.cls}`}>
+              <ShieldCheck size={12} />
+              {roleBadge.label}
+            </span>
+
+            <p className="text-text-secondary text-sm flex items-center justify-center gap-1 mt-2">
+              <Calendar size={13} /> {t('profile.memberSince', { date: liveUser.memberSince })}
             </p>
-            <button onClick={() => setEditing(!editing)}
-              className="mt-4 inline-flex items-center gap-1.5 border border-border text-text-secondary text-sm font-medium px-4 py-2 rounded-lg hover:bg-page-bg transition-colors">
+            <button
+              onClick={() => setEditing(!editing)}
+              className="mt-4 inline-flex items-center gap-1.5 border border-border text-text-secondary text-sm font-medium px-4 py-2 rounded-lg hover:bg-page-bg transition-colors"
+            >
               <Edit size={14} /> {editing ? t('profile.cancelEditing') : t('profile.editProfile')}
             </button>
           </div>
 
           <div className="bg-white border border-border rounded-lg p-4 space-y-2">
-            <button onClick={() => { setShowNotifPrefs(!showNotifPrefs); setShowChangePassword(false); }}
-              className="w-full flex items-center gap-2 text-sm text-text-primary hover:text-navy py-2 px-3 rounded-lg hover:bg-page-bg transition-colors text-left">
+            <button
+              onClick={() => { setShowNotifPrefs(!showNotifPrefs); setShowChangePassword(false); }}
+              className="w-full flex items-center gap-2 text-sm text-text-primary hover:text-navy py-2 px-3 rounded-lg hover:bg-page-bg transition-colors text-left"
+            >
               <Bell size={15} /> {t('profile.notificationPreferences')}
             </button>
-            <button onClick={() => { setShowChangePassword(!showChangePassword); setShowNotifPrefs(false); }}
-              className="w-full flex items-center gap-2 text-sm text-text-primary hover:text-navy py-2 px-3 rounded-lg hover:bg-page-bg transition-colors text-left">
+            <button
+              onClick={() => { setShowChangePassword(!showChangePassword); setShowNotifPrefs(false); }}
+              className="w-full flex items-center gap-2 text-sm text-text-primary hover:text-navy py-2 px-3 rounded-lg hover:bg-page-bg transition-colors text-left"
+            >
               <Lock size={15} /> {t('profile.changePassword')}
+            </button>
+            <button
+              onClick={handleLogout}
+              className="w-full flex items-center gap-2 text-sm text-critical hover:bg-red-50 py-2 px-3 rounded-lg transition-colors text-left"
+            >
+              <X size={15} /> Sign out
             </button>
           </div>
         </div>
 
         {/* Content */}
         <div className="lg:col-span-2 space-y-6">
-
           {/* Personal info */}
           <div className="bg-white border border-border rounded-lg p-6">
             <h3 className="font-semibold text-navy mb-4">{t('profile.personalInfo')}</h3>
             {editing ? (
               <div className="space-y-4">
-                <EditField label={t('profile.fullName')} name="name"    value={profile.name}              onChange={handleProfileChange} icon={User} />
-                <EditField label={t('profile.email')}    name="email"   value={profile.email}             onChange={handleProfileChange} icon={Mail} type="email" />
-                <EditField label={t('profile.phone')}    name="phone"   value={profile.phone}             onChange={handleProfileChange} icon={Phone} type="tel" />
-                <EditField label={t('profile.ward')}     name="ward"    value={profile.ward}              onChange={handleProfileChange} icon={MapPin} />
-                <EditField label={t('profile.address')}  name="address" value={profile.address}           onChange={handleProfileChange} icon={HomeIcon} />
-                <EditField label={t('profile.cityArea')} name="city"    value={profile.city}              onChange={handleProfileChange} icon={MapPin} />
+                <EditField label={t('profile.fullName')} name="name" value={profile.name} onChange={handleProfileChange} icon={User} />
+                <EditField label={t('profile.email')} name="email" value={profile.email} onChange={handleProfileChange} icon={Mail} type="email" />
+                <EditField label={t('profile.phone')} name="phone" value={profile.phone} onChange={handleProfileChange} icon={Phone} type="tel" />
+                <EditField label={t('profile.ward')} name="ward" value={profile.ward} onChange={handleProfileChange} icon={MapPin} />
+                <EditField label={t('profile.address')} name="address" value={profile.address} onChange={handleProfileChange} icon={HomeIcon} />
+                <EditField label={t('profile.cityArea')} name="city" value={profile.city} onChange={handleProfileChange} icon={MapPin} />
                 <div>
                   <label className="block text-xs text-text-secondary mb-1">{t('profile.preferredLanguage')}</label>
                   <div className="relative">
@@ -115,13 +177,13 @@ export default function Profile() {
               </div>
             ) : (
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-                <InfoItem icon={User}     label={t('profile.fullName')}         value={profile.name} />
-                <InfoItem icon={Mail}     label={t('profile.email')}            value={profile.email} />
-                <InfoItem icon={Phone}    label={t('profile.phone')}            value={profile.phone} />
-                <InfoItem icon={MapPin}   label={t('profile.ward')}             value={profile.ward} />
-                <InfoItem icon={HomeIcon} label={t('profile.address')}          value={profile.address} />
-                <InfoItem icon={MapPin}   label={t('profile.cityArea')}         value={profile.city} />
-                <InfoItem icon={Globe}    label={t('profile.preferredLanguage')} value={profile.preferredLanguage} />
+                <InfoItem icon={User} label={t('profile.fullName')} value={profile.name} />
+                <InfoItem icon={Mail} label={t('profile.email')} value={profile.email} />
+                <InfoItem icon={Phone} label={t('profile.phone')} value={profile.phone} />
+                <InfoItem icon={MapPin} label={t('profile.ward')} value={profile.ward} />
+                <InfoItem icon={HomeIcon} label={t('profile.address')} value={profile.address} />
+                <InfoItem icon={MapPin} label={t('profile.cityArea')} value={profile.city} />
+                <InfoItem icon={Globe} label={t('profile.preferredLanguage')} value={profile.preferredLanguage} />
               </div>
             )}
           </div>
@@ -159,21 +221,25 @@ export default function Profile() {
               <form onSubmit={handleSavePassword} className="space-y-4 max-w-sm">
                 <div>
                   <label className="block text-xs text-text-secondary mb-1">{t('profile.currentPassword')}</label>
-                  <input type="password" value={passwordForm.current} onChange={(e) => setPasswordForm({ ...passwordForm, current: e.target.value })}
+                  <input type="password" value={passwordForm.current}
+                    onChange={(e) => setPasswordForm({ ...passwordForm, current: e.target.value })}
                     required className="w-full border border-border rounded-lg px-3 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-navy/20" />
                 </div>
                 <div>
                   <label className="block text-xs text-text-secondary mb-1">{t('profile.newPassword')}</label>
-                  <input type="password" value={passwordForm.newPass} onChange={(e) => setPasswordForm({ ...passwordForm, newPass: e.target.value })}
+                  <input type="password" value={passwordForm.newPass}
+                    onChange={(e) => setPasswordForm({ ...passwordForm, newPass: e.target.value })}
                     required minLength={8} className="w-full border border-border rounded-lg px-3 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-navy/20" />
                   <p className="text-[11px] text-text-secondary mt-1">{t('profile.minChars')}</p>
                 </div>
                 <div>
                   <label className="block text-xs text-text-secondary mb-1">{t('profile.confirmNewPassword')}</label>
-                  <input type="password" value={passwordForm.confirm} onChange={(e) => setPasswordForm({ ...passwordForm, confirm: e.target.value })}
+                  <input type="password" value={passwordForm.confirm}
+                    onChange={(e) => setPasswordForm({ ...passwordForm, confirm: e.target.value })}
                     required className="w-full border border-border rounded-lg px-3 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-navy/20" />
                 </div>
-                <button type="submit" className="flex items-center gap-1.5 bg-navy text-white text-sm font-medium px-5 py-2.5 rounded-lg hover:bg-navy-dark transition-colors">
+                <button type="submit"
+                  className="flex items-center gap-1.5 bg-navy text-white text-sm font-medium px-5 py-2.5 rounded-lg hover:bg-navy-dark transition-colors">
                   <Lock size={14} /> {t('profile.updatePassword')}
                 </button>
               </form>

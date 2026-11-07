@@ -1,19 +1,21 @@
 import { useState, useRef } from 'react';
-import { Link, useSearchParams } from 'react-router-dom';
+import { Link, useSearchParams, useNavigate } from 'react-router-dom';
 import {
   ChevronRight, ChevronLeft, Home, Send, CheckCircle,
   ArrowRight, Upload, Camera, X, Image as ImageIcon,
   FileText, MapPin, ImagePlus, ClipboardCheck, Rocket,
+  AlertCircle,
 } from 'lucide-react';
 import { useTranslation } from 'react-i18next';
-import { CIVIC_SERVICES, generateComplaintId } from '../data/mockData';
+import { CIVIC_SERVICES } from '../data/mockData';
 import LocationPicker from '../components/ui/LocationPicker';
 
 export default function ReportComplaint() {
   const { t } = useTranslation();
+  const navigate = useNavigate();
   const [searchParams] = useSearchParams();
   const preselectedCategory = searchParams.get('category') || '';
-  const fileInputRef = useRef(null);
+  const fileInputRef  = useRef(null);
   const cameraInputRef = useRef(null);
 
   const STEPS = [
@@ -24,17 +26,21 @@ export default function ReportComplaint() {
     { num: 5, labelKey: 'report.steps.5', icon: Rocket },
   ];
 
-  const [step, setStep] = useState(1);
-  const [submitted, setSubmitted] = useState(false);
+  const [step, setStep]               = useState(1);
+  const [submitted, setSubmitted]     = useState(false);
   const [complaintId, setComplaintId] = useState('');
   const [submittedDate, setSubmittedDate] = useState('');
-  const [errors, setErrors] = useState({});
+  const [errors, setErrors]           = useState({});
+  const [submitError, setSubmitError] = useState('');
+  const [isSubmitting, setIsSubmitting] = useState(false);
 
-  const [form, setForm] = useState({ category: preselectedCategory, title: '', description: '' });
+  const [form, setForm]         = useState({ category: preselectedCategory, title: '', description: '' });
   const [location, setLocation] = useState({ address: '', ward: '', pincode: '', lat: '', lng: '' });
-  const [files, setFiles] = useState([]);
+  const [files, setFiles]       = useState([]);
+  // Preview URLs for selected files (revoked on reset)
+  const [previews, setPreviews] = useState([]);
 
-  // ── Handlers ──
+  // ── Handlers ──────────────────────────────────────────────────────────────
   const handleFormChange = (e) => {
     setForm({ ...form, [e.target.name]: e.target.value });
     if (errors[e.target.name]) setErrors({ ...errors, [e.target.name]: '' });
@@ -42,14 +48,22 @@ export default function ReportComplaint() {
 
   const handleFileAdd = (e) => {
     const newFiles = Array.from(e.target.files || []);
-    const validFiles = newFiles.filter((f) => f.type.startsWith('image/') && f.size <= 5 * 1024 * 1024);
-    setFiles((prev) => [...prev, ...validFiles].slice(0, 5));
+    const validFiles = newFiles.filter(
+      (f) => f.type.startsWith('image/') && f.size <= 5 * 1024 * 1024
+    );
+    const combined = [...files, ...validFiles].slice(0, 5);
+    setFiles(combined);
+    setPreviews(combined.map((f) => URL.createObjectURL(f)));
     e.target.value = '';
   };
 
-  const removeFile = (index) => setFiles((prev) => prev.filter((_, i) => i !== index));
+  const removeFile = (index) => {
+    const next = files.filter((_, i) => i !== index);
+    setFiles(next);
+    setPreviews(next.map((f) => URL.createObjectURL(f)));
+  };
 
-  // ── Validation ──
+  // ── Validation ─────────────────────────────────────────────────────────────
   const validateStep = (s) => {
     const newErrors = {};
     if (s === 1) {
@@ -65,16 +79,11 @@ export default function ReportComplaint() {
     return Object.keys(newErrors).length === 0;
   };
 
-  // ── Navigation ──
+  // ── Navigation ─────────────────────────────────────────────────────────────
   const goNext = () => {
     if (!validateStep(step)) return;
     if (step === 4) {
-      const id = generateComplaintId();
-      setComplaintId(id);
-      setSubmittedDate(new Date().toLocaleDateString('en-IN', { day: 'numeric', month: 'long', year: 'numeric' }));
-      setSubmitted(true);
-      setStep(5);
-      window.scrollTo({ top: 0, behavior: 'smooth' });
+      handleSubmit();
       return;
     }
     setStep((prev) => Math.min(prev + 1, 5));
@@ -86,14 +95,64 @@ export default function ReportComplaint() {
     window.scrollTo({ top: 0, behavior: 'smooth' });
   };
 
+  // ── Real API submit ────────────────────────────────────────────────────────
+  const handleSubmit = async () => {
+    setIsSubmitting(true);
+    setSubmitError('');
+
+    try {
+      const formData = new FormData();
+      formData.append('title',       form.title.trim());
+      formData.append('description', form.description.trim());
+      formData.append('category',    form.category);
+      formData.append('address',     location.address);
+      formData.append('ward',        location.ward);
+      formData.append('pincode',     location.pincode);
+      if (location.lat) formData.append('lat', location.lat);
+      if (location.lng) formData.append('lng', location.lng);
+      files.forEach((file) => formData.append('photos', file));
+
+      const res = await fetch('/api/complaints', {
+        method:      'POST',
+        credentials: 'include', // send JWT cookie
+        body:        formData,  // NO Content-Type header – browser sets multipart boundary
+      });
+
+      const data = await res.json();
+
+      if (!res.ok) {
+        setSubmitError(data.message || 'Submission failed. Please try again.');
+        setIsSubmitting(false);
+        return;
+      }
+
+      // ✅ Success
+      setComplaintId(data.complaint.complaintId);
+      setSubmittedDate(
+        new Date(data.complaint.createdAt).toLocaleDateString('en-IN', {
+          day: 'numeric', month: 'long', year: 'numeric',
+        })
+      );
+      setSubmitted(true);
+      setStep(5);
+      window.scrollTo({ top: 0, behavior: 'smooth' });
+    } catch (err) {
+      setSubmitError('Network error. Please check your connection and try again.');
+    } finally {
+      setIsSubmitting(false);
+    }
+  };
+
   const resetAll = () => {
     setForm({ category: '', title: '', description: '' });
     setLocation({ address: '', ward: '', pincode: '', lat: '', lng: '' });
     setFiles([]);
+    setPreviews([]);
     setStep(1);
     setSubmitted(false);
     setComplaintId('');
     setErrors({});
+    setSubmitError('');
   };
 
   const getCategoryName = () =>
@@ -121,7 +180,7 @@ export default function ReportComplaint() {
         <div className="bg-white border border-border rounded-lg p-4 mb-6">
           <div className="flex items-center justify-between">
             {STEPS.slice(0, 4).map((s, i) => {
-              const isActive = step === s.num;
+              const isActive   = step === s.num;
               const isComplete = step > s.num;
               return (
                 <div key={s.num} className="flex items-center flex-1">
@@ -220,10 +279,10 @@ export default function ReportComplaint() {
               <span className="text-sm font-medium text-text-primary">{t('report.uploadImage')}</span>
               <span className="text-xs text-text-secondary">{t('report.uploadFormats')}</span>
             </button>
-            <input ref={fileInputRef} type="file" accept="image/*" multiple onChange={handleFileAdd} className="hidden" />
+            <input ref={fileInputRef} type="file" accept="image/jpeg,image/png,image/webp" multiple onChange={handleFileAdd} className="hidden" />
           </div>
 
-          {/* File preview */}
+          {/* File previews */}
           {files.length > 0 && (
             <div>
               <p className="text-sm font-medium text-text-primary mb-2">
@@ -232,12 +291,12 @@ export default function ReportComplaint() {
               <div className="grid grid-cols-2 sm:grid-cols-3 gap-3">
                 {files.map((file, i) => (
                   <div key={i} className="relative border border-border rounded-lg overflow-hidden group">
-                    <div className="aspect-square bg-page-bg flex items-center justify-center">
-                      {file.type.startsWith('image/') ? (
-                        <img src={URL.createObjectURL(file)} alt={file.name} className="w-full h-full object-cover" />
-                      ) : (
-                        <ImageIcon size={32} className="text-text-secondary" />
-                      )}
+                    <div className="aspect-square bg-page-bg">
+                      <img
+                        src={previews[i]}
+                        alt={file.name}
+                        className="w-full h-full object-cover"
+                      />
                     </div>
                     <div className="p-2">
                       <p className="text-xs text-text-primary truncate">{file.name}</p>
@@ -298,6 +357,14 @@ export default function ReportComplaint() {
             )}
           </ReviewSection>
 
+          {/* Submit error */}
+          {submitError && (
+            <div className="flex items-start gap-2 bg-red-50 border border-red-200 rounded-lg p-3">
+              <AlertCircle size={16} className="text-critical mt-0.5 shrink-0" />
+              <p className="text-sm text-critical">{submitError}</p>
+            </div>
+          )}
+
           <div className="bg-navy/5 border border-navy/10 rounded-lg p-3">
             <p className="text-xs text-text-secondary">
               <span className="font-medium text-navy">{t('report.note')}</span>{' '}
@@ -341,12 +408,13 @@ export default function ReportComplaint() {
           </div>
 
           <div className="flex flex-col sm:flex-row items-center justify-center gap-3">
-            <Link to="/track" className="flex items-center gap-2 bg-navy text-white font-medium px-5 py-2.5 rounded-lg hover:bg-navy-dark transition-colors">
-              {t('report.trackComplaint')} <ArrowRight size={16} />
+            <Link to="/my-complaints" className="flex items-center gap-2 bg-navy text-white font-medium px-5 py-2.5 rounded-lg hover:bg-navy-dark transition-colors">
+              {t('report.viewMyComplaints')} <ArrowRight size={16} />
             </Link>
-            <Link to="/my-complaints" className="flex items-center gap-2 border border-border text-text-secondary font-medium px-5 py-2.5 rounded-lg hover:bg-page-bg transition-colors">
-              {t('report.viewMyComplaints')}
-            </Link>
+            <button onClick={resetAll}
+              className="flex items-center gap-2 border border-border text-text-secondary font-medium px-5 py-2.5 rounded-lg hover:bg-page-bg transition-colors">
+              Report Another
+            </button>
             <Link to="/" className="flex items-center gap-2 text-text-secondary font-medium px-5 py-2.5 hover:text-navy transition-colors">
               {t('report.backToHome')}
             </Link>
@@ -358,16 +426,23 @@ export default function ReportComplaint() {
       {!submitted && (
         <div className="flex items-center justify-between mt-6">
           {step > 1 ? (
-            <button type="button" onClick={goBack}
-              className="flex items-center gap-1.5 border border-border text-text-secondary font-medium px-5 py-2.5 rounded-lg hover:bg-white transition-colors">
+            <button type="button" onClick={goBack} disabled={isSubmitting}
+              className="flex items-center gap-1.5 border border-border text-text-secondary font-medium px-5 py-2.5 rounded-lg hover:bg-white transition-colors disabled:opacity-50">
               <ChevronLeft size={16} /> {t('report.back')}
             </button>
           ) : <div />}
 
-          <button type="button" onClick={goNext}
-            className={`flex items-center gap-2 font-semibold px-6 py-2.5 rounded-lg transition-colors ${step === 4 ? 'bg-success text-white hover:bg-green-700' : 'bg-navy text-white hover:bg-navy-dark'}`}>
+          <button type="button" onClick={goNext} disabled={isSubmitting}
+            className={`flex items-center gap-2 font-semibold px-6 py-2.5 rounded-lg transition-colors disabled:opacity-60 disabled:cursor-not-allowed ${step === 4 ? 'bg-success text-white hover:bg-green-700' : 'bg-navy text-white hover:bg-navy-dark'}`}>
             {step === 4 ? (
-              <><Send size={16} /> {t('report.submitComplaint')}</>
+              isSubmitting ? (
+                <>
+                  <span className="w-4 h-4 border-2 border-white/30 border-t-white rounded-full animate-spin" />
+                  Uploading…
+                </>
+              ) : (
+                <><Send size={16} /> {t('report.submitComplaint')}</>
+              )
             ) : (
               <>{t('report.next')} <ChevronRight size={16} /></>
             )}

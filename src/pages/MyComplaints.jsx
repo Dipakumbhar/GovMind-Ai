@@ -1,8 +1,8 @@
-import { useState, useMemo } from 'react';
+import { useState, useMemo, useEffect } from 'react';
 import { Link } from 'react-router-dom';
-import { Search, FileX, Calendar, MapPin, ArrowRight } from 'lucide-react';
+import { Search, FileX, Calendar, MapPin, ArrowRight, Image as ImageIcon, Loader2 } from 'lucide-react';
 import { useTranslation } from 'react-i18next';
-import { MOCK_COMPLAINTS, CIVIC_SERVICES } from '../data/mockData';
+import { CIVIC_SERVICES } from '../data/mockData';
 import StatusBadge from '../components/ui/StatusBadge';
 import PriorityBadge from '../components/ui/PriorityBadge';
 
@@ -10,21 +10,55 @@ const STATUS_VALUES = ['all', 'submitted', 'assigned', 'in-progress', 'resolved'
 
 export default function MyComplaints() {
   const { t } = useTranslation();
-  const [statusFilter, setStatusFilter] = useState('all');
+  const [statusFilter,   setStatusFilter]   = useState('all');
   const [categoryFilter, setCategoryFilter] = useState('all');
-  const [searchQuery, setSearchQuery] = useState('');
+  const [searchQuery,    setSearchQuery]    = useState('');
 
+  const [complaints, setComplaints] = useState([]);
+  const [loading,    setLoading]    = useState(true);
+  const [fetchError, setFetchError] = useState('');
+
+  // ── Fetch from backend ───────────────────────────────────────────────────
+  useEffect(() => {
+    let cancelled = false;
+    async function fetchComplaints() {
+      setLoading(true);
+      setFetchError('');
+      try {
+        const res  = await fetch('/api/complaints/mine', { credentials: 'include' });
+        const data = await res.json();
+        if (!cancelled) {
+          if (res.ok) {
+            setComplaints(data.complaints || []);
+          } else {
+            setFetchError(data.message || 'Failed to load complaints.');
+          }
+        }
+      } catch {
+        if (!cancelled) setFetchError('Network error. Please check your connection.');
+      } finally {
+        if (!cancelled) setLoading(false);
+      }
+    }
+    fetchComplaints();
+    return () => { cancelled = true; };
+  }, []);
+
+  // ── Filter in-browser ────────────────────────────────────────────────────
   const filtered = useMemo(() => {
-    return MOCK_COMPLAINTS.filter((c) => {
+    return complaints.filter((c) => {
       if (statusFilter !== 'all' && c.status !== statusFilter) return false;
       if (categoryFilter !== 'all' && c.category !== categoryFilter) return false;
       if (searchQuery) {
         const q = searchQuery.toLowerCase();
-        if (!c.title.toLowerCase().includes(q) && !c.id.toLowerCase().includes(q)) return false;
+        if (
+          !c.title.toLowerCase().includes(q) &&
+          !c.complaintId.toLowerCase().includes(q)
+        ) return false;
       }
       return true;
     });
-  }, [statusFilter, categoryFilter, searchQuery]);
+  }, [complaints, statusFilter, categoryFilter, searchQuery]);
 
   return (
     <div className="max-w-5xl mx-auto px-4 sm:px-6 py-8">
@@ -52,7 +86,7 @@ export default function MyComplaints() {
             className="border border-border rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-navy/20 bg-white">
             <option value="all">{t('myComplaints.allCategories')}</option>
             {CIVIC_SERVICES.map((s) => (
-              <option key={s.id} value={s.name}>{s.name}</option>
+              <option key={s.id} value={s.id}>{s.name}</option>
             ))}
           </select>
 
@@ -66,39 +100,90 @@ export default function MyComplaints() {
         </div>
       </div>
 
-      {/* Results */}
-      {filtered.length === 0 ? (
+      {/* Loading state */}
+      {loading && (
         <div className="bg-white border border-border rounded-lg p-12 text-center">
-          <FileX size={40} className="mx-auto text-text-secondary mb-3" />
-          <h3 className="font-semibold text-text-primary mb-1">{t('myComplaints.noComplaintsTitle')}</h3>
-          <p className="text-text-secondary text-sm">{t('myComplaints.noComplaintsDesc')}</p>
+          <Loader2 size={36} className="mx-auto text-navy animate-spin mb-3" />
+          <p className="text-text-secondary text-sm">Loading your complaints…</p>
         </div>
-      ) : (
-        <div className="space-y-4">
-          {filtered.map((c) => (
-            <div key={c.id} className="bg-white border border-border rounded-lg p-5 hover:shadow-sm transition-shadow">
-              <div className="flex flex-col sm:flex-row sm:items-start sm:justify-between gap-3 mb-3">
-                <div>
-                  <span className="text-xs font-mono font-semibold text-navy">{c.id}</span>
-                  <h3 className="font-semibold text-text-primary mt-1">{c.title}</h3>
-                </div>
-                <div className="flex items-center gap-2 shrink-0">
-                  <StatusBadge status={c.status} />
-                  <PriorityBadge priority={c.priority} />
-                </div>
-              </div>
-              <div className="flex flex-wrap items-center gap-x-4 gap-y-1 text-xs text-text-secondary mb-3">
-                <span className="bg-navy/5 text-navy px-2 py-0.5 rounded font-medium">{c.category}</span>
-                <span className="flex items-center gap-1"><MapPin size={12} /> {c.ward}</span>
-                <span className="flex items-center gap-1"><Calendar size={12} /> {t('myComplaints.submittedLabel')} {c.dateSubmitted}</span>
-                <span className="flex items-center gap-1"><Calendar size={12} /> {t('myComplaints.updatedLabel')} {c.lastUpdated}</span>
-              </div>
-              <Link to={`/complaint/${c.id}`} className="inline-flex items-center gap-1 text-sm font-medium text-navy hover:text-saffron transition-colors">
-                {t('myComplaints.viewDetails')} <ArrowRight size={14} />
-              </Link>
-            </div>
-          ))}
+      )}
+
+      {/* Error state */}
+      {!loading && fetchError && (
+        <div className="bg-white border border-border rounded-lg p-12 text-center">
+          <FileX size={40} className="mx-auto text-critical mb-3" />
+          <p className="text-critical font-semibold mb-1">Failed to load complaints</p>
+          <p className="text-text-secondary text-sm">{fetchError}</p>
         </div>
+      )}
+
+      {/* Results */}
+      {!loading && !fetchError && (
+        filtered.length === 0 ? (
+          <div className="bg-white border border-border rounded-lg p-12 text-center">
+            <FileX size={40} className="mx-auto text-text-secondary mb-3" />
+            <h3 className="font-semibold text-text-primary mb-1">{t('myComplaints.noComplaintsTitle')}</h3>
+            <p className="text-text-secondary text-sm">{t('myComplaints.noComplaintsDesc')}</p>
+          </div>
+        ) : (
+          <div className="space-y-4">
+            {filtered.map((c) => (
+              <div key={c._id} className="bg-white border border-border rounded-lg p-5 hover:shadow-sm transition-shadow">
+                <div className="flex flex-col sm:flex-row sm:items-start sm:justify-between gap-3 mb-3">
+                  <div className="flex-1 min-w-0">
+                    <span className="text-xs font-mono font-semibold text-navy">{c.complaintId}</span>
+                    <h3 className="font-semibold text-text-primary mt-1">{c.title}</h3>
+                  </div>
+                  <div className="flex items-center gap-2 shrink-0">
+                    <StatusBadge status={c.status} />
+                    <PriorityBadge priority={c.priority} />
+                  </div>
+                </div>
+
+                <div className="flex flex-wrap items-center gap-x-4 gap-y-1 text-xs text-text-secondary mb-3">
+                  <span className="bg-navy/5 text-navy px-2 py-0.5 rounded font-medium">{c.category}</span>
+                  {c.location?.ward && (
+                    <span className="flex items-center gap-1"><MapPin size={12} /> {c.location.ward}</span>
+                  )}
+                  <span className="flex items-center gap-1">
+                    <Calendar size={12} /> {t('myComplaints.submittedLabel')}{' '}
+                    {new Date(c.createdAt).toLocaleDateString('en-IN')}
+                  </span>
+                  {/* Thumbnail strip */}
+                  {c.photos && c.photos.length > 0 && (
+                    <span className="flex items-center gap-1 text-navy">
+                      <ImageIcon size={12} /> {c.photos.length} photo{c.photos.length > 1 ? 's' : ''}
+                    </span>
+                  )}
+                </div>
+
+                {/* Photo thumbnails */}
+                {c.photos && c.photos.length > 0 && (
+                  <div className="flex gap-2 mb-3">
+                    {c.photos.slice(0, 3).map((photo, i) => (
+                      <img
+                        key={i}
+                        src={photo.url}
+                        alt={`Complaint photo ${i + 1}`}
+                        className="w-14 h-14 object-cover rounded-lg border border-border"
+                      />
+                    ))}
+                    {c.photos.length > 3 && (
+                      <div className="w-14 h-14 rounded-lg border border-border bg-page-bg flex items-center justify-center text-xs font-semibold text-text-secondary">
+                        +{c.photos.length - 3}
+                      </div>
+                    )}
+                  </div>
+                )}
+
+                <Link to={`/complaint/${c.complaintId}`}
+                  className="inline-flex items-center gap-1 text-sm font-medium text-navy hover:text-saffron transition-colors">
+                  {t('myComplaints.viewDetails')} <ArrowRight size={14} />
+                </Link>
+              </div>
+            ))}
+          </div>
+        )
       )}
     </div>
   );

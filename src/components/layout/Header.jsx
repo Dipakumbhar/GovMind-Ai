@@ -1,7 +1,8 @@
 import { useState, useEffect, useRef, useCallback } from 'react';
-import { Link, NavLink, useLocation } from 'react-router-dom';
-import { Menu, X, LogIn, User } from 'lucide-react';
+import { Link, NavLink, useLocation, useNavigate } from 'react-router-dom';
+import { Menu, X, LogIn, User, LogOut, ChevronDown } from 'lucide-react';
 import { useTranslation } from 'react-i18next';
+import { useAuth } from '../../contexts/AuthContext';
 
 const NAV_LINKS = [
   { to: '/', labelKey: 'nav.home' },
@@ -20,9 +21,13 @@ const LANGUAGES = [
 
 export default function Header() {
   const { t, i18n } = useTranslation();
+  const { user, logout } = useAuth();
+  const navigate = useNavigate();
   const [mobileOpen, setMobileOpen] = useState(false);
+  const [userMenuOpen, setUserMenuOpen] = useState(false);
   const location = useLocation();
   const menuButtonRef = useRef(null);
+  const userMenuRef = useRef(null);
 
   const activeLang = i18n.language;
 
@@ -33,20 +38,32 @@ export default function Header() {
   // Close mobile menu on route change
   useEffect(() => {
     setMobileOpen(false);
+    setUserMenuOpen(false);
   }, [location.pathname]);
 
   // Close on Escape key
   const handleKeyDown = useCallback((e) => {
-    if (e.key === 'Escape' && mobileOpen) {
-      setMobileOpen(false);
-      menuButtonRef.current?.focus();
+    if (e.key === 'Escape') {
+      if (mobileOpen) { setMobileOpen(false); menuButtonRef.current?.focus(); }
+      if (userMenuOpen) setUserMenuOpen(false);
     }
-  }, [mobileOpen]);
+  }, [mobileOpen, userMenuOpen]);
 
   useEffect(() => {
     document.addEventListener('keydown', handleKeyDown);
     return () => document.removeEventListener('keydown', handleKeyDown);
   }, [handleKeyDown]);
+
+  // Close user dropdown when clicking outside
+  useEffect(() => {
+    const handleClick = (e) => {
+      if (userMenuRef.current && !userMenuRef.current.contains(e.target)) {
+        setUserMenuOpen(false);
+      }
+    };
+    document.addEventListener('mousedown', handleClick);
+    return () => document.removeEventListener('mousedown', handleClick);
+  }, []);
 
   // Prevent body scroll when mobile menu is open
   useEffect(() => {
@@ -56,6 +73,16 @@ export default function Header() {
 
   const toggleMenu = () => setMobileOpen((prev) => !prev);
   const closeMenu = () => setMobileOpen(false);
+
+  const handleLogout = async () => {
+    await logout();
+    navigate('/login', { replace: true });
+  };
+
+  // Initials from user name
+  const initials = user?.name
+    ? user.name.split(' ').map((n) => n[0]).join('').toUpperCase().slice(0, 2)
+    : '?';
 
   return (
     <header className="sticky top-0 z-50 bg-white border-b border-border shadow-sm">
@@ -128,24 +155,72 @@ export default function Header() {
               ))}
             </div>
 
-            <Link
-              to="/login"
-              className="flex items-center gap-1.5 bg-navy text-white text-sm font-medium px-4 py-2 rounded hover:bg-navy-dark transition-colors whitespace-nowrap"
-            >
-              <LogIn size={15} aria-hidden="true" />
-              {t('nav.login')}
-            </Link>
+            {/* Auth: logged in = user menu, logged out = Login button */}
+            {user ? (
+              <div className="relative" ref={userMenuRef}>
+                <button
+                  onClick={() => setUserMenuOpen((p) => !p)}
+                  className="flex items-center gap-2 bg-navy/5 hover:bg-navy/10 text-navy text-sm font-medium px-3 py-1.5 rounded-lg transition-colors"
+                  aria-expanded={userMenuOpen}
+                  aria-haspopup="true"
+                >
+                  <span className="w-7 h-7 rounded-full bg-navy text-white text-xs font-bold flex items-center justify-center">
+                    {initials}
+                  </span>
+                  <span className="max-w-[120px] truncate">{user.name.split(' ')[0]}</span>
+                  <ChevronDown size={14} className={`transition-transform ${userMenuOpen ? 'rotate-180' : ''}`} />
+                </button>
+
+                {userMenuOpen && (
+                  <div className="absolute right-0 mt-2 w-48 bg-white border border-border rounded-lg shadow-lg py-1 z-50">
+                    <Link
+                      to="/profile"
+                      className="flex items-center gap-2 px-4 py-2.5 text-sm text-text-primary hover:bg-page-bg hover:text-navy transition-colors"
+                    >
+                      <User size={14} /> My Profile
+                    </Link>
+                    <hr className="my-1 border-border" />
+                    <button
+                      onClick={handleLogout}
+                      className="w-full flex items-center gap-2 px-4 py-2.5 text-sm text-critical hover:bg-red-50 transition-colors"
+                    >
+                      <LogOut size={14} /> Sign out
+                    </button>
+                  </div>
+                )}
+              </div>
+            ) : (
+              <Link
+                to="/login"
+                className="flex items-center gap-1.5 bg-navy text-white text-sm font-medium px-4 py-2 rounded hover:bg-navy-dark transition-colors whitespace-nowrap"
+              >
+                <LogIn size={15} aria-hidden="true" />
+                {t('nav.login')}
+              </Link>
+            )}
           </div>
 
           {/* Mobile controls */}
           <div className="flex lg:hidden items-center gap-1">
-            <Link
-              to="/login"
-              className="p-2 text-navy rounded hover:bg-navy/5 transition-colors"
-              aria-label={t('header.loginAccount')}
-            >
-              <User size={20} aria-hidden="true" />
-            </Link>
+            {user ? (
+              <Link
+                to="/profile"
+                className="p-2 text-navy rounded hover:bg-navy/5 transition-colors"
+                aria-label="My Profile"
+              >
+                <div className="w-7 h-7 rounded-full bg-navy text-white text-xs font-bold flex items-center justify-center">
+                  {initials}
+                </div>
+              </Link>
+            ) : (
+              <Link
+                to="/login"
+                className="p-2 text-navy rounded hover:bg-navy/5 transition-colors"
+                aria-label={t('header.loginAccount')}
+              >
+                <User size={20} aria-hidden="true" />
+              </Link>
+            )}
             <button
               ref={menuButtonRef}
               onClick={toggleMenu}
@@ -210,14 +285,25 @@ export default function Header() {
                 </button>
               ))}
             </div>
-            <Link
-              to="/login"
-              onClick={closeMenu}
-              className="flex items-center gap-1.5 bg-navy text-white text-xs font-medium px-3 py-1.5 rounded hover:bg-navy-dark transition-colors"
-            >
-              <LogIn size={14} aria-hidden="true" />
-              {t('nav.login')}
-            </Link>
+
+            {user ? (
+              <button
+                onClick={() => { handleLogout(); closeMenu(); }}
+                className="flex items-center gap-1.5 text-critical border border-red-200 text-xs font-medium px-3 py-1.5 rounded hover:bg-red-50 transition-colors"
+              >
+                <LogOut size={14} aria-hidden="true" />
+                Sign out
+              </button>
+            ) : (
+              <Link
+                to="/login"
+                onClick={closeMenu}
+                className="flex items-center gap-1.5 bg-navy text-white text-xs font-medium px-3 py-1.5 rounded hover:bg-navy-dark transition-colors"
+              >
+                <LogIn size={14} aria-hidden="true" />
+                {t('nav.login')}
+              </Link>
+            )}
           </div>
         </div>
       )}
