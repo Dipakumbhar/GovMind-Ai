@@ -1,0 +1,21 @@
+{
+  "name": "govmind-backend",
+  "version": "1.0.0",
+  "description": "GovMind AI Backend - Shared API server for Client Panel and Admin Panel",
+  "main": "server.js",
+  "scripts": {
+    "start": "node server.js",
+    "dev": "node --watch server.js",
+    "seed": "node seed.js",
+    "test": "node tests/runner.js && node tests/extended_runner.js && node tests/cloudinary_runner.js"
+  },
+  "dependencies": {
+    "bcryptjs": "^2.4.3",
+    "cors": "^2.8.5",
+    "dotenv": "^16.4.5",
+    "express": "^4.21.0",
+    "govmind-ai-platform": "file:..",
+    "jsonwebtoken": "^9.0.2",
+    "mongoose": "^8.8.0"
+  }
+}
